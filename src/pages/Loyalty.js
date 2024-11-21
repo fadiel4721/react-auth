@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
-import { jwtDecode } from 'jwt-decode';
-
+import { jwtDecode } from "jwt-decode";
 
 export default function LoyaltyPage() {
   const [loyaltyData, setLoyaltyData] = useState(null); // Data loyalitas
@@ -66,17 +65,17 @@ export default function LoyaltyPage() {
       setError("Token tidak ditemukan.");
       return;
     }
-
+  
     // Decode token untuk mendapatkan user ID
     const decodedToken = jwtDecode(token);
     const userId = decodedToken.id; // Ambil userId dari token
-
+  
     const newDiscountCode =
       "DISCOUNT-" + Math.random().toString(36).substr(2, 8).toUpperCase();
-
+  
     try {
       console.log("Mengirim kode diskon:", newDiscountCode, "untuk userId:", userId); // Debugging
-
+  
       const response = await axios.post(
         "http://localhost:8000/api/loyalty/discount-code",
         { discount_code: newDiscountCode, user_id: userId },
@@ -86,15 +85,22 @@ export default function LoyaltyPage() {
           },
         }
       );
-
+  
       console.log("Kode diskon berhasil disimpan:", response.data);
-      setDiscountCode(newDiscountCode); // Update state dengan kode diskon baru
-      fetchLoyaltyData(); // Ambil data loyalitas terbaru setelah penyimpanan kode diskon
+  
+      // Cek apakah response berhasil
+      if (response.status === 200) {
+        setDiscountCode(newDiscountCode); // Update state dengan kode diskon baru
+        fetchLoyaltyData(); // Ambil data loyalitas terbaru setelah penyimpanan kode diskon
+      } else {
+        setError("Gagal menyimpan kode diskon.");
+      }
     } catch (err) {
       console.error("Error menyimpan kode diskon:", err.response?.data || err.message);
       setError("Gagal menyimpan kode diskon.");
     }
   };
+  
 
   // Ambil data pengguna saat komponen dimuat
   useEffect(() => {
@@ -140,7 +146,7 @@ export default function LoyaltyPage() {
   // Konfigurasi level loyalitas
   const levels = [
     { level: 0, minSpent: 0, discount: 0 },
-    { level: 1, minSpent: 100000, discount: 0 },
+    { level: 1, minSpent: 100000, discount: 10 },
     { level: 2, minSpent: 500000, discount: 15 },
     { level: 3, minSpent: 1000000, discount: 20 },
     { level: 4, minSpent: 2000000, discount: 25 },

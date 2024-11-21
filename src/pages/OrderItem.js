@@ -12,8 +12,8 @@ export default function OrderItem() {
   const [selectedPaymentMethod, setSelectedPaymentMethod] = React.useState('CASH');
   const [discountCode, setDiscountCode] = React.useState('');
   const [finalPrice, setFinalPrice] = React.useState(totalPrice);
-  const [loyaltyInfo, setLoyaltyInfo] = React.useState(null);
   const [kasirId, setKasirId] = React.useState(null);
+  const [discountAmount, setDiscountAmount] = React.useState(0);
 
   // Hooks for initial data and token processing
   React.useEffect(() => {
@@ -29,30 +29,44 @@ export default function OrderItem() {
     }
   }, []);
 
-  // Fetch loyalty info
-  React.useEffect(() => {
-    const fetchLoyaltyInfo = async () => {
-      try {
-        const token = localStorage.getItem('token');
-        const response = await axios.get('http://localhost:8000/api/loyalty', {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (response.data.success) setLoyaltyInfo(response.data.loyalty);
-      } catch (error) {
-        console.error('Error loading loyalty info:', error);
-      }
-    };
-    fetchLoyaltyInfo();
-  }, []);
-
   // Update final price with discount
   React.useEffect(() => {
-    if (loyaltyInfo && discountCode === loyaltyInfo.discount_code) {
-      setFinalPrice(totalPrice - (totalPrice * loyaltyInfo.discount / 100));
-    } else {
-      setFinalPrice(totalPrice);
+    const discountPrice = (totalPrice * discountAmount) / 100;
+    setFinalPrice(totalPrice - discountPrice);
+  }, [discountAmount, totalPrice]);
+
+  // Validate discount code
+  const validateDiscountCode = async () => {
+    if (!discountCode) {
+      alert('Silakan masukkan kode diskon.');
+      return;
     }
-  }, [discountCode, loyaltyInfo, totalPrice]);
+
+    if (!kasirId) {
+      alert('ID kasir tidak ditemukan. Pastikan Anda sudah login.');
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get(`http://localhost:8000/api/loyalty/show`, {
+        params: { discount_code: discountCode, user_id: kasirId },
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (response.data.success) {
+        // Assuming response.data.discount_percentage is the discount percentage
+        const discountPercentage = response.data.discount_percentage || 0;
+        setDiscountAmount(discountPercentage);
+        alert('Kode diskon berhasil divalidasi!');
+      } else {
+        alert(response.data.message || 'Kode diskon tidak valid.');
+      }
+    } catch (error) {
+      console.error('Error validating discount code:', error);
+      alert('Terjadi kesalahan saat memvalidasi kode diskon.');
+    }
+  };
 
   // Handle product quantity increase
   const handleIncrease = (productId) => {
@@ -90,18 +104,22 @@ export default function OrderItem() {
   const handleProcessOrder = async () => {
     const token = localStorage.getItem('token');
     if (!token || !kasirId) return alert('Anda belum login atau ID kasir tidak ditemukan!');
+
     const payload = {
-  transaction_time: new Date().toISOString(), // Changed here
-  kasir_id: kasirId,
-  total_price: finalPrice,
-  total_item: Object.keys(orderItems).reduce((sum, productId) => sum + orderItems[productId].quantity, 0),
-  payment_method: selectedPaymentMethod,
-  discount_code: discountCode || null,
-  order_items: Object.keys(orderItems).map((productId) => ({
-    product_id: parseInt(productId, 10),
-    quantity: orderItems[productId].quantity,
-    total_price: orderItems[productId].price * orderItems[productId].quantity,
-  })),
+      transaction_time: new Date().toISOString(),
+      kasir_id: kasirId,
+      total_price: finalPrice,
+      total_item: Object.keys(orderItems).reduce(
+        (sum, productId) => sum + orderItems[productId].quantity,
+        0
+      ),
+      payment_method: selectedPaymentMethod,
+      discount_code: discountCode || null,
+      order_items: Object.keys(orderItems).map((productId) => ({
+        product_id: parseInt(productId, 10),
+        quantity: orderItems[productId].quantity,
+        total_price: orderItems[productId].price * orderItems[productId].quantity,
+      })),
     };
 
     try {
@@ -114,26 +132,20 @@ export default function OrderItem() {
         localStorage.removeItem('orderItems');
         setDiscountCode('');
         setFinalPrice(0);
+        setDiscountAmount(0);
         setSelectedPaymentMethod('CASH');
       } else {
         alert('Order gagal diproses.');
       }
     } catch (error) {
       console.error('Error processing order:', error);
-      alert('Gagal memproses order');
+      alert('Kode Discount Telah Digunakan!');
     }
   };
 
   return (
     <div className="container mt-4">
       <h2 className="text-center mb-4">Detail Pesanan</h2>
-
-      {loyaltyInfo && (
-        <div className="alert alert-primary">
-          <h5>Level Anda: {loyaltyInfo.level}</h5>
-          <p>Diskon: {loyaltyInfo.discount}%</p>
-        </div>
-      )}
 
       <div className="mb-4">
         <h4>Produk dalam Pesanan</h4>
@@ -155,10 +167,7 @@ export default function OrderItem() {
                   />
                   <div>
                     <h5 className="mb-1">{item.name}</h5>
-                    <p className="mb-0">
-                      {/* Add check to ensure price is defined */}
-                      Rp {item.price ? item.price.toLocaleString() : 'Harga tidak tersedia'}
-                    </p>
+                    <p className="mb-0">Rp {item.price.toLocaleString()}</p>
                   </div>
                 </div>
                 <div className="d-flex align-items-center">
@@ -199,6 +208,9 @@ export default function OrderItem() {
           value={discountCode}
           onChange={(e) => setDiscountCode(e.target.value)}
         />
+        <button className="btn btn-info" onClick={validateDiscountCode}>
+          Validasi Diskon
+        </button>
       </div>
 
       <div className="mb-4">
@@ -216,7 +228,13 @@ export default function OrderItem() {
         </div>
       </div>
 
-      <h4>Total Harga: Rp {isNaN(finalPrice) ? 'Invalid Price' : finalPrice.toLocaleString()}</h4>
+      <div className="mb-4">
+        <h4>Ringkasan Harga</h4>
+        <p>Subtotal: Rp {totalPrice.toLocaleString()}</p>
+        <p>Diskon: {discountAmount}%</p>
+        <h4>Total Harga: Rp {finalPrice.toLocaleString()}</h4>
+      </div>
+
       <button className="btn btn-success w-100 mt-3" onClick={handleProcessOrder}>
         Proses Pesanan
       </button>
