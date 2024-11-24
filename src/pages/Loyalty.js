@@ -34,11 +34,14 @@ export default function LoyaltyPage() {
     try {
       if (!userId) return; // Jangan panggil API jika userId belum tersedia
 
-      const response = await axios.get(`http://localhost:8000/api/loyalty/show`, {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
-      });
+      const response = await axios.get(
+        `http://localhost:8000/api/loyalty/show`,
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+        }
+      );
       const newLoyaltyData = response.data.data;
       setLoyaltyData(newLoyaltyData); // Ambil data loyalitas
 
@@ -65,17 +68,22 @@ export default function LoyaltyPage() {
       setError("Token tidak ditemukan.");
       return;
     }
-  
+
     // Decode token untuk mendapatkan user ID
     const decodedToken = jwtDecode(token);
     const userId = decodedToken.id; // Ambil userId dari token
-  
+
     const newDiscountCode =
       "DISCOUNT-" + Math.random().toString(36).substr(2, 8).toUpperCase();
-  
+
     try {
-      console.log("Mengirim kode diskon:", newDiscountCode, "untuk userId:", userId); // Debugging
-  
+      console.log(
+        "Mengirim kode diskon:",
+        newDiscountCode,
+        "untuk userId:",
+        userId
+      ); // Debugging
+
       const response = await axios.post(
         "http://localhost:8000/api/loyalty/discount-code",
         { discount_code: newDiscountCode, user_id: userId },
@@ -85,9 +93,9 @@ export default function LoyaltyPage() {
           },
         }
       );
-  
+
       console.log("Kode diskon berhasil disimpan:", response.data);
-  
+
       // Cek apakah response berhasil
       if (response.status === 200) {
         setDiscountCode(newDiscountCode); // Update state dengan kode diskon baru
@@ -96,11 +104,13 @@ export default function LoyaltyPage() {
         setError("Gagal menyimpan kode diskon.");
       }
     } catch (err) {
-      console.error("Error menyimpan kode diskon:", err.response?.data || err.message);
+      console.error(
+        "Error menyimpan kode diskon:",
+        err.response?.data || err.message
+      );
       setError("Gagal menyimpan kode diskon.");
     }
   };
-  
 
   // Ambil data pengguna saat komponen dimuat
   useEffect(() => {
@@ -119,16 +129,15 @@ export default function LoyaltyPage() {
 
   // Cek apakah pengguna baru saja naik level
   useEffect(() => {
-    if (levelUp && loyaltyData) {
+    if (loyaltyData) {
       const storedLevel = parseInt(localStorage.getItem("level") || "0");
       if (loyaltyData.level > storedLevel) {
-        console.log("Level naik, menghasilkan kode diskon baru."); // Debugging
+        console.log("Level naik, menghasilkan kode diskon baru.");
         generateDiscountCode();
-        localStorage.setItem("level", loyaltyData.level); // Simpan level saat ini ke localStorage
+        localStorage.setItem("level", loyaltyData.level); // Simpan level ke localStorage
       }
-      setLevelUp(false); // Reset levelUp untuk tidak generate ulang
     }
-  }, [levelUp, loyaltyData]);
+  }, [loyaltyData]); // Memantau setiap perubahan data loyalitas
 
   // State loading
   if (loading) {
@@ -146,7 +155,7 @@ export default function LoyaltyPage() {
   // Konfigurasi level loyalitas
   const levels = [
     { level: 0, minSpent: 0, discount: 0 },
-    { level: 1, minSpent: 100000, discount: 10 },
+    { level: 1, minSpent: 100000, discount: 0 },
     { level: 2, minSpent: 500000, discount: 15 },
     { level: 3, minSpent: 1000000, discount: 20 },
     { level: 4, minSpent: 2000000, discount: 25 },
@@ -158,7 +167,9 @@ export default function LoyaltyPage() {
   const nextLevel = levels.find((l) => l.level === level + 1);
 
   const progressToNextLevel = nextLevel
-    ? ((total_spent - currentLevel.minSpent) / (nextLevel.minSpent - currentLevel.minSpent)) * 100
+    ? ((total_spent - currentLevel.minSpent) /
+        (nextLevel.minSpent - currentLevel.minSpent)) *
+      100
     : 100;
 
   return (
@@ -167,7 +178,9 @@ export default function LoyaltyPage() {
       <div className="card shadow-sm p-4 mb-4">
         <div className="text-center">
           <h3>Level {level}</h3>
-          <p>Nama Pengguna: <strong>{userName}</strong></p>
+          <p>
+            Nama Pengguna: <strong>{userName}</strong>
+          </p>
           <p>Total Belanja: {total_spent.toLocaleString()} rupiah</p>
           <p>Diskon: {discount}%</p>
           {discountCode ? (
@@ -176,7 +189,8 @@ export default function LoyaltyPage() {
             </div>
           ) : (
             <div className="alert alert-info mt-3">
-              Anda telah mencapai level {level}, namun belum ada kode diskon.
+              Anda telah mencapai level {level}, namun masih harus naik level 2
+              ya untuk mendapatkan diskon.
             </div>
           )}
         </div>
